@@ -1,77 +1,137 @@
+import requests
+import os
 import xarray as xr
 import pandas as pd
 import numpy as np
-import os
+from html.parser import HTMLParser
 
-def extract_argo_data():
-    file_path = "data/raw/BD2902120_001.nc"
+class LinkParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.links = []
     
-    print("Opening file...")
-    ds = xr.open_dataset(file_path)
+    def handle_starttag(self, tag, attrs):
+        if tag == "a":
+            for attr, value in attrs:
+                if attr == "href" and value.endswith(".nc"):
+                    self.links.append(value)
+
+def get_file_list(float_id):
+    base_url = f"https://data-argo.ifremer.fr/dac/incois/{float_id}/profiles/"
+    response = requests.get(base_url)
+    parser = LinkParser()
+    parser.feed(response.text)
+    return base_url, parser.links
+
+def download_files(float_id, max_files=10):
+    base_url, files = get_file_list(float_id)
+    save_folder = "data/raw"
+    os.makedirs(save_folder, exist_ok=True)
     
-    print("Available variables:")
-    for var in ds.data_vars:
-        print(f"  {var}")
+    downloaded = []
+    print(f"Found {len(files)} files for float {float_id}")
     
-    print("\nExtracting key variables...")
+    for filename in files[:max_files]:
+        save_path = os.path.join(save_folder, filename)
+        if os.path.exists(save_path):
+            print(f"Already exists: {filename}")
+            downloaded.append(save_path)
+            continue
+        
+        url = base_url + filename
+        r = requests.get(url, stream=True)
+        if r.status_code == 200:
+            with open(save_path, "wb") as f:
+                for chunk in r.iter_content(chunk_size=1024):
+                    f.write(chunk)
+            print(f"Downloaded: {filename}")
+            downloaded.append(save_path)
+        else:
+            print(f"Failed: {filename}")
     
+    return downloaded
+
+def extract_profiles(file_path, float_id):
     rows = []
-    n_profiles = ds.sizes["N_PROF"]
+    try:
+        ds = xr.open_dataset(file_path)
+        n_profiles = ds.sizes["N_PROF"]
+        
+        for i in range(n_profiles):
+            try:
+                lat = float(ds["LATITUDE"].values[i])
+                lon = float(ds["LONGITUDE"].values[i])
+                date = str(ds["JULD"].values[i])
+                
+                temp, salt, pres = None, None, None
+                
+                if "TEMP" in ds.data_vars:
+                    temp = ds["TEMP"].values[i]
+                if "PSAL" in ds.data_vars:
+                    salt = ds["PSAL"].values[i]
+                if "PRES" in ds.data_vars:
+                    pres = ds["PRES"].values[i]
+                
+                temp_surface = round(float(temp[0]), 3) if temp is not None and not np.isnan(temp[0]) else None
+                salt_surface = round(float(salt[0]), 3) if salt is not None and not np.isnan(salt[0]) else None
+                max_depth = round(float(np.nanmax(pres)), 1) if pres is not None and not all(np.isnan(pres)) else None
+                
+                if lat != 0 and lon != 0:
+                    rows.append({
+                        "float_id": float_id,
+                        "profile_index": i,
+                        "latitude": lat,
+                        "longitude": lon,
+                        "date": date,
+                        "temp_surface_c": temp_surface,
+                        "salinity_surface": salt_surface,
+                        "max_depth_m": max_depth,
+                        "num_depth_levels": len(temp) if temp is not None else None,
+                        "source_file": os.path.basename(file_path)
+                    })
+            except Exception as e:
+                pass
+        ds.close()
+    except Exception as e:
+        print(f"Error reading {file_path}: {e}")
     
-    temp_var = None
-    salt_var = None
-    pres_var = None
-    
-    for var in ds.data_vars:
-        if "TEMP" in var and "QC" not in var and "ERROR" not in var and "ADJUSTED" not in var:
-            temp_var = var
-        if "PSAL" in var and "QC" not in var and "ERROR" not in var and "ADJUSTED" not in var:
-            salt_var = var
-        if "PRES" in var and "QC" not in var and "ERROR" not in var and "ADJUSTED" not in var:
-            pres_var = var
-    
-    print(f"\nUsing: temp={temp_var}, salt={salt_var}, pres={pres_var}")
-    
-    for i in range(n_profiles):
-        try:
-            lat = float(ds["LATITUDE"].values[i])
-            lon = float(ds["LONGITUDE"].values[i])
-            date = str(ds["JULD"].values[i])
-            float_id = "2902120"
-            
-            pres = ds[pres_var].values[i] if pres_var else None
-            temp = ds[temp_var].values[i] if temp_var else None
-            salt = ds[salt_var].values[i] if salt_var else None
-            
-            temp_surface = float(temp[0]) if temp is not None and not np.isnan(temp[0]) else None
-            salt_surface = float(salt[0]) if salt is not None and not np.isnan(salt[0]) else None
-            max_depth = float(np.nanmax(pres)) if pres is not None else None
-            
-            rows.append({
-                "float_id": float_id,
-                "profile_index": i,
-                "latitude": lat,
-                "longitude": lon,
-                "date": date,
-                "temp_surface_c": round(temp_surface, 3) if temp_surface else None,
-                "salinity_surface": round(salt_surface, 3) if salt_surface else None,
-                "max_depth_m": round(max_depth, 1) if max_depth else None,
-                "num_depth_levels": len(temp) if temp is not None else None
-            })
-            
-        except Exception as e:
-            print(f"Skipping profile {i}: {e}")
-    
-    df = pd.DataFrame(rows)
-    
-    print("\n--- Clean extracted data ---")
-    print(df.to_string())
-    
-    os.makedirs("data", exist_ok=True)
-    df.to_csv("data/argo_profiles.csv", index=False)
-    print("\nSaved to data/argo_profiles.csv")
-    
-    return df
+    return rows
 
 if __name__ == "__main__":
-    extract_argo_data()
+    float_ids = ["2902120", "2902121", "2902122"]
+    
+    all_rows = []
+    
+    for float_id in float_ids:
+        print(f"\nProcessing float {float_id}...")
+        try:
+            files = download_files(float_id, max_files=10)
+            for f in files:
+                rows = extract_profiles(f, float_id)
+                all_rows.extend(rows)
+                print(f"  Extracted {len(rows)} profiles from {os.path.basename(f)}")
+        except Exception as e:
+            print(f"  Skipping float {float_id}: {e}")
+    
+    df = pd.DataFrame(all_rows)
+    print(f"\nTotal profiles collected: {len(df)}")
+    print(df.head(10).to_string())
+    
+    df.to_csv("data/argo_profiles.csv", index=False)
+    print("\nSaved to data/argo_profiles.csv")
+
+    from sqlalchemy import create_engine
+import pandas as pd
+
+def load_to_postgres():
+    df = pd.read_csv("data/argo_profiles.csv")
+    
+    engine = create_engine("postgresql://postgres:postgres@localhost:5432/floatchat_db")
+    
+    df.to_sql("argo_profiles", engine, if_exists="replace", index=False)
+    
+    print(f"Loaded {len(df)} rows into PostgreSQL!")
+    print("Table: argo_profiles")
+
+if __name__ == "__main__":
+    load_to_postgres()
