@@ -4,7 +4,7 @@
 
 🔗 **[Live Demo](https://floatchat-cnegona8bgfdnx5lvt....streamlit.app)**  
 📁 **[GitHub](https://github.com/mahikala2312/floatchat)**
-> AI-powered conversational interface for ARGO Indian Ocean float data
+<img width="1919" height="940" alt="image" src="https://github.com/user-attachments/assets/37d01fe5-a3c5-4c50-8eb9-d857c44a725c" />
 
 ## What it does
 FloatChat lets you ask natural language questions about real ARGO ocean float data from the Indian Ocean. Type a question, get an intelligent AI answer backed by actual oceanographic data from INCOIS.
