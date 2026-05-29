@@ -61,13 +61,33 @@ with col2:
         color_col = "highlighted"
         color_map = {"All floats": "blue"}
     
+    view_mode = st.radio("Color map by:", ["Float ID", "Temperature", "Salinity"], horizontal=True)
+    
+    if st.session_state.highlighted_floats:
+        color_col = "highlighted"
+        color_scale = None
+        color_map = {"Mentioned": "red", "Other": "blue"}
+    elif view_mode == "Temperature":
+        color_col = "temp_surface_c"
+        color_scale = "RdYlBu_r"
+        color_map = None
+    elif view_mode == "Salinity":
+        color_col = "salinity_surface"
+        color_scale = "Blues"
+        color_map = None
+    else:
+        color_col = "float_id"
+        color_scale = None
+        color_map = None
+
     fig = px.scatter_mapbox(
         map_df,
         lat="latitude",
         lon="longitude",
         hover_name="float_id",
-        hover_data=["date", "max_depth_m"],
+        hover_data=["date", "max_depth_m", "temp_surface_c", "salinity_surface"],
         color=color_col,
+        color_continuous_scale=color_scale,
         color_discrete_map=color_map,
         zoom=3,
         height=550,
