@@ -31,13 +31,17 @@ def ask(question):
     
     client = Groq(api_key=os.getenv("GROQ_API_KEY"))
     
-    response = client.chat.completions.create(
-        model="llama-3.1-8b-instant",
-        messages=[
-            {"role": "system", "content": "You are FloatChat, an AI assistant for ARGO ocean float data from the Indian Ocean. Answer questions based on the data provided."},
-            {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {question}"}
-        ]
-    )
+    try:
+        response = client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[
+                {"role": "system", "content": "You are FloatChat, an AI assistant for ARGO ocean float data from the Indian Ocean. Answer questions based on the data provided."},
+                {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {question}"}
+            ]
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        return f"I encountered an error retrieving data. Please try again. ({str(e)})"
     
     return response.choices[0].message.content
 
