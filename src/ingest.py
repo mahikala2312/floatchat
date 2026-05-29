@@ -70,7 +70,7 @@ def extract_profiles(file_path, float_id):
                         "profile_index": i,
                         "latitude": lat,
                         "longitude": lon,
-                        "date": date,
+                        "date": str(ds["JULD"].values[i])[:10],
                         "temp_surface_c": temp_surface,
                         "salinity_surface": salt_surface,
                         "max_depth_m": max_depth,
