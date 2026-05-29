@@ -1,9 +1,9 @@
 # 🌊 FloatChat
 
+> AI-powered conversational interface for ARGO Indian Ocean float data
 
-## 🔗 Live Demo
-[FloatChat App](https://floatchat-cnegona8bgfdnx5lvt....streamlit.app)
-
+🔗 **[Live Demo](https://floatchat-cnegona8bgfdnx5lvt....streamlit.app)**  
+📁 **[GitHub](https://github.com/mahikala2312/floatchat)**
 > AI-powered conversational interface for ARGO Indian Ocean float data
 
 ## What it does
