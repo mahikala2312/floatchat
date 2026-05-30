@@ -36,3 +36,4 @@ streamlit run app.py
 
 ## Architecture
 User Query → FAISS semantic search → retrieve relevant float profiles → LLM generates answer
+
